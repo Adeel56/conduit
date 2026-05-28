@@ -1,0 +1,11 @@
+.git
+.gitignore
+*.md
+docs/
+target/
+build/
+.env*
+*.tfstate*
+.terraform/
+.idea/
+.vscode/
