@@ -1,0 +1,29 @@
+# Secrets — never commit
+*.env
+.env*
+!.env.example
+*.pem
+*.key
+secrets/
+
+# Build artifacts
+target/
+build/
+*.jar
+!**/gradle-wrapper.jar
+
+# IDE / OS
+.idea/
+.vscode/
+*.iml
+.DS_Store
+
+# Local infra state
+*.tfstate
+*.tfstate.*
+.terraform/
+
+# Logs
+*.log
+
+*:Zone.Identifier
