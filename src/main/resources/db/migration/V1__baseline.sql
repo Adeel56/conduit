@@ -1,0 +1,8 @@
+-- CON-3 walking-skeleton baseline migration.
+--
+-- Intentionally introduces no schema. Its job is to prove the Flyway pipeline runs end to end:
+-- on first boot Flyway creates the flyway_schema_history table and records this version (V1),
+-- which is exactly the plumbing the walking skeleton exists to verify.
+--
+-- The real normalized data model (ADR-0008: Organization, User, Source, Destination, Route,
+-- Event, Delivery, Attempt) lands as V2+ in later tickets, each with its own reverse plan.

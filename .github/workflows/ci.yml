@@ -1,0 +1,41 @@
+# CI for pull requests into main. This is the agent-safety harness the ticket calls for: every
+# change is built and tested before it can merge. It becomes a required status check on the
+# `protect-main` ruleset (CONTRIBUTING.md), so red CI blocks the merge.
+#
+# Security scans (Trivy image scan, CodeQL) are a deliberate placeholder here — wired in a
+# follow-up ticket per the container baseline. Calling that out so the gap is visible, not silent.
+
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  # Also run on pushes to main (post-merge) as a backstop.
+  push:
+    branches: [main]
+
+permissions:
+  contents: read   # least privilege: CI only needs to read the repo
+
+concurrency:
+  # Cancel superseded runs on the same branch/PR to save CI minutes.
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    name: Build & test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21 (Temurin)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin   # matches ADR-0006 (Temurin via SDKMAN locally)
+          java-version: '21'
+          cache: maven             # cache ~/.m2 keyed on pom.xml
+
+      - name: Build and test
+        run: ./mvnw -B -ntp verify

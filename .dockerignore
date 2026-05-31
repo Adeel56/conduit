@@ -1,11 +1,36 @@
+# Keep the build context small and keep secrets / local junk out of the image
+# (container-baseline.md: "secrets, .git, local junk never baked in").
+
+# VCS & CI
 .git
 .gitignore
+.github/
+
+# Docs & markdown (not needed at build time)
 *.md
 docs/
+
+# Build output (the image builds the jar itself; never copy host artifacts in)
 target/
 build/
+
+# Secrets & local config — never bake these in
 .env*
+*.pem
+*.key
+secrets/
+
+# Local infra state
 *.tfstate*
 .terraform/
+
+# Compose / Docker descriptors (not part of the app build context)
+docker-compose.yml
+Dockerfile
+
+# IDE / OS / logs
 .idea/
 .vscode/
+*.iml
+.DS_Store
+*.log
