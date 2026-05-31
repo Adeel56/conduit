@@ -1,0 +1,44 @@
+spring:
+  application:
+    name: conduit
+
+  # ADR-0004: virtual threads. Request handling and (later) blocking delivery code run on
+  # virtual threads, so simple synchronous code scales to large I/O concurrency.
+  threads:
+    virtual:
+      enabled: true
+
+  # 12-factor config (ADR-0006): the datasource is read from the environment, never hardcoded.
+  # No defaults for credentials on purpose — the app must be told where its DB is.
+  datasource:
+    url: ${SPRING_DATASOURCE_URL}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
+
+  jpa:
+    open-in-view: false        # don't hold a DB connection open for the whole request
+    hibernate:
+      ddl-auto: validate       # schema is owned by Flyway, never by Hibernate auto-DDL
+
+  # Flyway owns the schema. The baseline migration proves the migration pipeline runs.
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+# Actuator: expose only /health, mapped to the root path so the URL is GET /health (ticket AC).
+# Details are hidden from anonymous callers (secure default) — the public body is {"status":"UP"}.
+# The DB still factors into the aggregate status, so a DB outage flips /health to 503 DOWN.
+management:
+  endpoints:
+    web:
+      base-path: /
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
+      probes:
+        enabled: true          # adds /health/liveness and /health/readiness for later Kubernetes
+
+server:
+  port: ${SERVER_PORT:8080}

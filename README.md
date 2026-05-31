@@ -19,9 +19,9 @@ If you are reading this as an interviewer: the `/docs` folder is the point. It s
 
 ## The arc we are running (compressed ~2-year product lifecycle)
 
-1. **Inception** — problem brief, threat model, scope boundary, first decisions. ← *we are here*
+1. **Inception** — problem brief, threat model, scope boundary, first decisions.
 2. **Design** — architecture, data model, API contract, ADRs.
-3. **Foundation** — repo, branching, CI skeleton, local docker-compose.
+3. **Foundation** — repo, branching, CI skeleton, local docker-compose. ← *we are here*
 4. **Build sprints** — features as tickets → branches → PRs → review → merge.
 5. **Hardening** — load tests, security pass, rollback drills, staging.
 6. **Launch** — release strategy, Terraform apply, Kubernetes.
@@ -37,6 +37,32 @@ If you are reading this as an interviewer: the `/docs` folder is the point. It s
 | `docs/decisions/` | Build-vs-buy register — what we build vs. delegate, and why. |
 | `docs/templates/` | The change/reversal template every ticket uses. |
 | `docs/runbooks/` | Operational docs: how to deploy, how to roll back, how to recover. |
+
+## Running locally (walking skeleton)
+
+The current build is a **walking skeleton** (CON-3): a Spring Boot app + Postgres + a `/health`
+endpoint, containerized, with CI. No product features yet — it exists to prove the plumbing.
+
+**Prerequisites:** Docker + Docker Compose. (For running the app outside a container you also need
+JDK 21 — Temurin via SDKMAN, per ADR-0006.)
+
+```bash
+cp .env.example .env          # then edit POSTGRES_PASSWORD
+docker compose up --build     # starts Postgres, a Redis stub, and the app
+
+curl localhost:8080/health    # -> {"status":"UP"}  (200; 503 if the DB is down)
+
+docker compose down           # stop;  add -v to also wipe the Postgres volume
+```
+
+Or run just the dependencies in containers and the app from source on the host:
+
+```bash
+docker compose up -d postgres
+./mvnw spring-boot:run         # reads SPRING_DATASOURCE_* from your environment / .env
+```
+
+Run the tests with `./mvnw verify`.
 
 ## Core principles (non-negotiable, cross-cutting)
 

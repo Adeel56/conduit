@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <!--
+      Spring Boot starter parent: pins versions for the whole Spring ecosystem (the BOM),
+      and configures sensible plugin defaults (including the layered-jar repackage). We track
+      the latest stable 3.x line per ADR-0004 (Spring Boot 3.x / Java 21 / virtual threads).
+    -->
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>3.5.14</version>
+        <relativePath/> <!-- look the parent up from the repository, not a local path -->
+    </parent>
+
+    <groupId>dev.conduit</groupId>
+    <artifactId>conduit</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+    <name>conduit</name>
+    <description>Conduit — self-hostable webhook receive/store/deliver service (walking skeleton)</description>
+
+    <properties>
+        <!-- Java 21: required for virtual threads (ADR-0004). The parent reads this property. -->
+        <java.version>21</java.version>
+    </properties>
+
+    <dependencies>
+        <!-- Embedded Tomcat + Spring MVC: serves HTTP, including the Actuator endpoints. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+
+        <!-- Actuator: production-grade /health (incl. DB connectivity) without hand-rolling it. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+
+        <!-- JPA/Hibernate: the persistence layer the real data model (ADR-0008) will use. It also
+             wires the DataSource that Actuator's db health indicator probes. Inert until entities
+             exist; present now to prove the plumbing. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-jpa</artifactId>
+        </dependency>
+
+        <!-- Flyway: reversible, versioned migrations (ADR-0004). Core + the Postgres module that
+             Flyway 10+ requires for Postgres support. -->
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-database-postgresql</artifactId>
+        </dependency>
+
+        <!-- Postgres JDBC driver: runtime only (compiled code never imports it directly). -->
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+
+        <!-- JUnit 5 + AssertJ + Spring test support. Used by the trivial smoke test. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <!-- Repackages the app into an executable, *layered* jar (layers enabled by default
+                 in Spring Boot 3.x). The Dockerfile extracts those layers for cache-friendly builds. -->
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <configuration>
+                    <layers>
+                        <enabled>true</enabled>
+                    </layers>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+
+</project>
