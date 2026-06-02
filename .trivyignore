@@ -1,15 +1,18 @@
 # .trivyignore — accepted vulnerabilities (the documented allowlist for the CI Trivy gate).
 #
-# Empty by design: nothing is suppressed yet. Accepting a CVE is a *reviewed security decision*,
-# not a silent mute — every entry MUST carry: why it's accepted, an owner, and an expiry.
+# Accepting a CVE is a *reviewed security decision*, not a silent mute — every entry MUST carry:
+# why it's accepted, an owner, and an expiry. The gate runs with `ignore-unfixed: true`, so a CVE
+# only reaches this file if a fix exists somewhere that we cannot yet pull in.
 #
-# Format: one vulnerability ID per line; blank lines and lines starting with `#` are ignored.
-# An optional `exp:YYYY-MM-DD` suffix makes the suppression self-expire (the gate re-breaks at
-# that date, forcing a conscious re-review). The gate already runs with `ignore-unfixed: true`,
-# so a CVE only reaches this file if it has an available fix we are consciously deferring.
-#
-# To accept a finding (rides on a ticket, reviewed like any control):
-#
-#   # CVE-2025-XXXXX: HIGH in <package>. Accepted because <not reachable / disputed / fix pending>.
-#   # Owner: @adeel  Reversal: delete this line (next scan re-flags it).
-#   CVE-2025-XXXXX exp:2026-09-01
+# Format: one vulnerability ID per line; blank lines and `#` comments ignored. The `exp:YYYY-MM-DD`
+# suffix makes the suppression self-expire — at that date the gate re-flags the CVE, forcing a
+# conscious re-review (so suppressions can't quietly live forever).
+
+# CVE-2026-41254: HIGH in liblcms2-2 (Little-CMS colour-management lib) in the distroless base OS.
+# Accepted (time-boxed) because: (1) a fix exists in Debian (2.14-2 -> 2.14-2+deb12u1) but NO rebuilt
+# gcr.io/distroless/java21-debian12 image carrying it is published yet, so it cannot be fixed by a
+# digest bump today (verified: the :nonroot tag digest is unchanged from the one we pin); (2) it is
+# not reachable from Conduit — a webhook service that does no colour management / image decoding.
+# Owner: @adeel  Reversal: delete this line (next scan re-flags it).
+# Re-review at expiry: bump the distroless digest once a rebuilt image ships, then remove this line.
+CVE-2026-41254 exp:2026-07-17

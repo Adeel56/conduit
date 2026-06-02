@@ -25,6 +25,20 @@
     <properties>
         <!-- Java 21: required for virtual threads (ADR-0004). The parent reads this property. -->
         <java.version>21</java.version>
+
+        <!-- Security overrides (CON-6): re-point BOM-managed versions to patched releases that fix
+             HIGH/CRITICAL CVEs the CON-5 Trivy gate flagged. These override the same properties in
+             the spring-boot-dependencies 3.5.14 BOM (which still pins the vulnerable versions).
+             EXIT CONDITION: remove each line once we move to a Spring Boot patch whose BOM pins
+             a version >= the one below; then the BOM provides the fix and the override is redundant. -->
+
+        <!-- tomcat-embed-core 10.1.54 -> 10.1.55: CVE-2026-41293 / -43512 / -43515 (CRITICAL),
+             CVE-2026-41284 / -42498 / -43513 (HIGH). Remove when Spring Boot's BOM pins >= 10.1.55. -->
+        <tomcat.version>10.1.55</tomcat.version>
+
+        <!-- postgresql JDBC 42.7.10 -> 42.7.11: CVE-2026-42198 (HIGH).
+             Remove when Spring Boot's BOM pins >= 42.7.11. -->
+        <postgresql.version>42.7.11</postgresql.version>
     </properties>
 
     <dependencies>
