@@ -62,6 +62,13 @@
             <artifactId>spring-boot-starter-data-jpa</artifactId>
         </dependency>
 
+        <!-- Spring Security: the API-key auth filter chain and the public-route allowlist (CON-8).
+             Version managed by the Spring Boot 3.5.14 BOM. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security</artifactId>
+        </dependency>
+
         <!-- Flyway: reversible, versioned migrations (ADR-0004). Core + the Postgres module that
              Flyway 10+ requires for Postgres support. -->
         <dependency>
