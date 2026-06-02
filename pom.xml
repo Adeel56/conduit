@@ -72,6 +72,29 @@
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
         </dependency>
+
+        <!-- Testcontainers integration testing (CON-4). All three are version-managed by the
+             Spring Boot 3.5.14 parent BOM (which imports testcontainers-bom 1.21.4), so no
+             <version> is declared — verified against Maven Central per the CLAUDE.md dep rule.
+             - spring-boot-testcontainers: @ServiceConnection support (auto-wires the datasource
+               to the container).
+             - junit-jupiter: the @Testcontainers / @Container lifecycle extension.
+             - postgresql: the PostgreSQLContainer. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-testcontainers</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>postgresql</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>
