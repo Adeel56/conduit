@@ -1,0 +1,64 @@
+# CodeQL static analysis (CON-5). Scans OUR source for security bug patterns (injection, unsafe
+# deserialization, path traversal, SSRF, …) and reports alerts to the repo Security tab. Runs as
+# its own workflow so it executes in parallel with build-and-test and the Trivy image scan.
+#
+# All actions are pinned by full commit SHA (supply-chain control; tags are mutable). The trailing
+# `# vX.Y.Z` comments are for humans / Dependabot — the SHA is what's enforced.
+#
+# NOTE (private repo): uploading results to the Security tab requires code scanning / GitHub
+# Advanced Security to be enabled (Settings → Code security). If it is off, the analyze step will
+# fail at upload — enable it, then re-run. Public repos get this for free.
+name: CodeQL
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    # Establish a baseline on the default branch so PR alerts diff against trunk.
+    branches: [main]
+
+# Deny by default; the analyze job elevates only what it needs.
+permissions:
+  contents: read
+
+concurrency:
+  group: codeql-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyze:
+    name: CodeQL analyze (java-kotlin)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read          # checkout (also required for CodeQL on private repos)
+      security-events: write  # the one elevated grant: upload results to the Security tab
+      actions: read           # read workflow run metadata (required on private repos)
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false   # don't leave the token in .git/config
+
+      # build-mode: none does not compile the project, but CodeQL still resolves Maven
+      # dependencies; pin Temurin 21 (ADR-0006) so that resolution uses the right JDK.
+      - name: Set up JDK 21 (Temurin)
+        uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      # languages: java-kotlin is the current identifier (covers Java; future-proofs for Kotlin).
+      # build-mode: none — this app has no annotation processors / code generation, so CodeQL can
+      # analyse the source directly without a full compile (faster, GitHub's default for Java).
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@7211b7c8077ea37d8641b6271f6a365a22a5fbfa # v4.36.0
+        with:
+          languages: java-kotlin
+          build-mode: none
+
+      - name: Perform CodeQL analysis
+        uses: github/codeql-action/analyze@7211b7c8077ea37d8641b6271f6a365a22a5fbfa # v4.36.0
+        with:
+          category: "/language:java-kotlin"   # distinct category so it won't collide with Trivy's SARIF

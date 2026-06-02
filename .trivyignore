@@ -1,0 +1,15 @@
+# .trivyignore — accepted vulnerabilities (the documented allowlist for the CI Trivy gate).
+#
+# Empty by design: nothing is suppressed yet. Accepting a CVE is a *reviewed security decision*,
+# not a silent mute — every entry MUST carry: why it's accepted, an owner, and an expiry.
+#
+# Format: one vulnerability ID per line; blank lines and lines starting with `#` are ignored.
+# An optional `exp:YYYY-MM-DD` suffix makes the suppression self-expire (the gate re-breaks at
+# that date, forcing a conscious re-review). The gate already runs with `ignore-unfixed: true`,
+# so a CVE only reaches this file if it has an available fix we are consciously deferring.
+#
+# To accept a finding (rides on a ticket, reviewed like any control):
+#
+#   # CVE-2025-XXXXX: HIGH in <package>. Accepted because <not reachable / disputed / fix pending>.
+#   # Owner: @adeel  Reversal: delete this line (next scan re-flags it).
+#   CVE-2025-XXXXX exp:2026-09-01
