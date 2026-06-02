@@ -1,9 +1,9 @@
-# CI for pull requests into main. This is the agent-safety harness the ticket calls for: every
-# change is built and tested before it can merge. It becomes a required status check on the
-# `protect-main` ruleset (CONTRIBUTING.md), so red CI blocks the merge.
+# CI for pull requests into main. This is the agent-safety harness the project relies on: every
+# change is built, tested, and security-scanned before it can merge. The jobs run in parallel so
+# feedback stays fast; CodeQL static analysis lives in its own workflow (codeql.yml).
 #
-# Security scans (Trivy image scan, CodeQL) are a deliberate placeholder here — wired in a
-# follow-up ticket per the container baseline. Calling that out so the gap is visible, not silent.
+# Actions are pinned by full commit SHA (supply-chain control — tags are mutable); the trailing
+# `# vX.Y.Z` comments are for humans / Dependabot.
 
 name: CI
 
@@ -14,8 +14,9 @@ on:
   push:
     branches: [main]
 
+# Deny by default; jobs elevate only what they need.
 permissions:
-  contents: read   # least privilege: CI only needs to read the repo
+  contents: read
 
 concurrency:
   # Cancel superseded runs on the same branch/PR to save CI minutes.
@@ -26,12 +27,17 @@ jobs:
   build-and-test:
     name: Build & test
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read   # explicit (matches the other jobs); needs nothing beyond checkout
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
 
       - name: Set up JDK 21 (Temurin)
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
         with:
           distribution: temurin   # matches ADR-0006 (Temurin via SDKMAN locally)
           java-version: '21'
@@ -39,3 +45,67 @@ jobs:
 
       - name: Build and test
         run: ./mvnw -B -ntp verify
+
+  trivy-image-scan:
+    name: Trivy image scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read          # checkout
+      security-events: write  # upload SARIF to the Security tab (non-fatal; see the upload step)
+    env:
+      IMAGE: conduit:ci-${{ github.sha }}
+      # Pull the vulnerability DBs from GHCR to avoid Docker Hub rate-limit flakiness.
+      TRIVY_DB_REPOSITORY: ghcr.io/aquasecurity/trivy-db:2
+      TRIVY_JAVA_DB_REPOSITORY: ghcr.io/aquasecurity/trivy-java-db:1
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      # Build the exact image this PR would ship and scan THAT (not a registry image).
+      - name: Build image
+        run: docker build -t "$IMAGE" .
+
+      # Step A — produce SARIF for the Security tab. Never fails the job (exit-code 0); the gate is
+      # step B. `limit-severities-for-sarif` is required or the SARIF ignores `severity` and floods
+      # the Security tab with LOW/MEDIUM noise.
+      - name: Trivy scan (SARIF for the Security tab)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: image
+          image-ref: ${{ env.IMAGE }}
+          format: sarif
+          output: trivy-results.sarif
+          severity: HIGH,CRITICAL
+          limit-severities-for-sarif: true
+          ignore-unfixed: true
+          trivyignores: .trivyignore
+          exit-code: '0'
+
+      # Upload even if the gate (step B) fails (if: always), and don't let a private-repo
+      # "code scanning not enabled" 403 fail the job (continue-on-error) — step B is the
+      # authoritative pass/fail. Distinct category so it won't merge with CodeQL's results.
+      - name: Upload Trivy SARIF
+        if: always()
+        continue-on-error: true
+        uses: github/codeql-action/upload-sarif@7211b7c8077ea37d8641b6271f6a365a22a5fbfa # v4.36.0
+        with:
+          sarif_file: trivy-results.sarif
+          category: trivy-image
+
+      # Step B — the gate. `format: table` makes exit-code reliable (with format: sarif the action
+      # is known to write the file but exit 0 even on findings). exit-code 1 turns the job red on a
+      # *fixable* HIGH/CRITICAL. Inputs MUST match step A so the Security tab and the gate agree.
+      - name: Trivy scan (fail the build on HIGH/CRITICAL)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: image
+          image-ref: ${{ env.IMAGE }}
+          format: table
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          trivyignores: .trivyignore
+          exit-code: '1'
+          skip-setup-trivy: true   # reuse the Trivy binary + cached DB from step A
