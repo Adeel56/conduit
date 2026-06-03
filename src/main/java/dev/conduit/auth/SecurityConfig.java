@@ -1,6 +1,7 @@
 package dev.conduit.auth;
 
 import dev.conduit.apikey.ApiKeyService;
+import jakarta.servlet.DispatcherType;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -28,6 +29,12 @@ public class SecurityConfig {
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
+                        // Don't "secure" the framework error dispatch: a binding/conversion failure
+                        // (e.g. a non-UUID {id}) forwards to /error on an ERROR dispatch where the
+                        // API-key filter doesn't re-run, so without this it would surface as a
+                        // misleading 401. Permitting ERROR lets the real status (e.g. 400) through;
+                        // the original REQUEST dispatch still enforces auth (no key -> 401).
+                        .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
                         .requestMatchers("/health", "/health/**").permitAll()
                         .requestMatchers("/ingest/**").permitAll()
                         .anyRequest().authenticated())
