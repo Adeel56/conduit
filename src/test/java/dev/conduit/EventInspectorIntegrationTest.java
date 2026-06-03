@@ -68,8 +68,8 @@ class EventInspectorIntegrationTest extends AbstractPostgresIntegrationTest {
 
     @Test
     void listReturnsOnlyTheCallersOrgEventsNewestFirstWithSize() {
-        UUID orgA = UUID.randomUUID();
-        UUID orgB = UUID.randomUUID();
+        UUID orgA = newOrg("org-a");
+        UUID orgB = newOrg("org-b");
         Source srcA = sources.create(orgA, "src-a");
         Source srcB = sources.create(orgB, "src-b");
         // 3 events for A (received_at decreasing => insertion order is newest-first), 2 for B.
@@ -107,8 +107,8 @@ class EventInspectorIntegrationTest extends AbstractPostgresIntegrationTest {
 
     @Test
     void crossTenantDetailReturns404IdenticalToANonexistentId() {
-        UUID orgA = UUID.randomUUID();
-        UUID orgB = UUID.randomUUID();
+        UUID orgA = newOrg("org-a");
+        UUID orgB = newOrg("org-b");
         Source srcA = sources.create(orgA, "src-a");
         Source srcB = sources.create(orgB, "src-b");
         UUID aEvent = seedEvent(orgA, srcA.getId(), "mine".getBytes(StandardCharsets.UTF_8), BASE);
@@ -135,8 +135,8 @@ class EventInspectorIntegrationTest extends AbstractPostgresIntegrationTest {
 
     @Test
     void sourceIdFilterStaysOrgScoped() {
-        UUID orgA = UUID.randomUUID();
-        UUID orgB = UUID.randomUUID();
+        UUID orgA = newOrg("org-a");
+        UUID orgB = newOrg("org-b");
         Source srcA = sources.create(orgA, "src-a");
         Source srcB = sources.create(orgB, "src-b");
         seedEvent(orgA, srcA.getId(), "a".getBytes(StandardCharsets.UTF_8), BASE);
@@ -158,7 +158,7 @@ class EventInspectorIntegrationTest extends AbstractPostgresIntegrationTest {
 
     @Test
     void pageSizeIsClampedToTheHardMax() {
-        UUID org = UUID.randomUUID();
+        UUID org = newOrg("org");
         Source src = sources.create(org, "src");
         for (int i = 0; i < 105; i++) {
             seedEvent(org, src.getId(), "x".getBytes(StandardCharsets.UTF_8), BASE.minusSeconds(i));
@@ -195,7 +195,7 @@ class EventInspectorIntegrationTest extends AbstractPostgresIntegrationTest {
 
     @Test
     void detailRendersTextAsUtf8AndBinaryAsBase64() {
-        UUID org = UUID.randomUUID();
+        UUID org = newOrg("org");
         Source src = sources.create(org, "src");
         byte[] text = "{\"hello\":\"world\"}".getBytes(StandardCharsets.UTF_8);
         byte[] binary = {(byte) 0xFF, (byte) 0xFE, 0x00, (byte) 0xC0}; // not valid UTF-8
@@ -219,7 +219,7 @@ class EventInspectorIntegrationTest extends AbstractPostgresIntegrationTest {
 
     @Test
     void pageParamNavigatesAndNegativePageClamps() {
-        UUID org = UUID.randomUUID();
+        UUID org = newOrg("org");
         Source src = sources.create(org, "src");
         for (int i = 0; i < 105; i++) {
             seedEvent(org, src.getId(), "x".getBytes(StandardCharsets.UTF_8), BASE.minusSeconds(i));
@@ -246,7 +246,7 @@ class EventInspectorIntegrationTest extends AbstractPostgresIntegrationTest {
 
     @Test
     void paginationIsStableWhenReceivedAtTies() {
-        UUID org = UUID.randomUUID();
+        UUID org = newOrg("org");
         Source src = sources.create(org, "src");
         Set<String> seeded = new HashSet<>();
         for (int i = 0; i < 5; i++) { // identical received_at: only the id tiebreaker makes the order total
@@ -267,7 +267,7 @@ class EventInspectorIntegrationTest extends AbstractPostgresIntegrationTest {
 
     @Test
     void malformedParamsReturn400WithAValidKey() {
-        String key = apiKeys.create(UUID.randomUUID(), "key").plaintextKey();
+        String key = apiKeys.create(newOrg("malformed-params-org"), "key").plaintextKey();
         // Binding/conversion failures are client errors (400), not a misleading 401, for an authed caller.
         assertThat(rest.exchange("/events/not-a-uuid", HttpMethod.GET, withKey(key), JSON_MAP).getStatusCode())
                 .isEqualTo(HttpStatus.BAD_REQUEST);

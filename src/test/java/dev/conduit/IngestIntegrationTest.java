@@ -50,7 +50,7 @@ class IngestIntegrationTest extends AbstractPostgresIntegrationTest {
 
     @Test
     void validRequestStoresEventAndReturns202() {
-        UUID orgId = UUID.randomUUID();
+        UUID orgId = newOrg("acme");
         Source source = sourceService.create(orgId, "stripe-prod");
 
         HttpHeaders headers = new HttpHeaders();
@@ -86,7 +86,7 @@ class IngestIntegrationTest extends AbstractPostgresIntegrationTest {
 
     @Test
     void inactiveSourceReturns404LikeAnUnknownKey() {
-        Source source = sourceService.create(UUID.randomUUID(), "deactivated");
+        Source source = sourceService.create(newOrg("deactivated-org"), "deactivated");
         source.deactivate();
         sourceRepository.save(source);
 
@@ -100,7 +100,7 @@ class IngestIntegrationTest extends AbstractPostgresIntegrationTest {
 
     @Test
     void oversizeBodyReturns413() {
-        Source source = sourceService.create(UUID.randomUUID(), "big-payloads");
+        Source source = sourceService.create(newOrg("big-payloads-org"), "big-payloads");
         byte[] tooBig = new byte[(int) ingestProperties.maxBodySize().toBytes() + 1];
         Arrays.fill(tooBig, (byte) 'x');
 
