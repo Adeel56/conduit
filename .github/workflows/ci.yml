@@ -58,15 +58,54 @@ jobs:
       # Pull the vulnerability DBs from GHCR to avoid Docker Hub rate-limit flakiness.
       TRIVY_DB_REPOSITORY: ghcr.io/aquasecurity/trivy-db:2
       TRIVY_JAVA_DB_REPOSITORY: ghcr.io/aquasecurity/trivy-java-db:1
+      # Stable, workspace-relative cache dir for Trivy's downloaded DBs. We cache this dir
+      # ourselves (date-keyed, see below) instead of leaving it to the action's built-in cache,
+      # so the key is explicit and auditable. Trivy reads/writes its DBs here.
+      TRIVY_CACHE_DIR: ${{ github.workspace }}/.cache/trivy
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
 
-      # Build the exact image this PR would ship and scan THAT (not a registry image).
+      # Date stamp (UTC, YYYY-MM-DD) used in the Trivy DB cache key. GitHub Actions has no native
+      # date expression, so we compute one here. A new day -> a new key -> a guaranteed cold cache
+      # for that day -> Trivy redownloads a fresh DB. This is what makes the date-keyed cache safe:
+      # it can never serve a stale DB beyond the day it was fetched (no stale-DB false-negative).
+      - name: Compute DB cache date
+        id: trivy-db-date
+        run: echo "date=$(date -u +%F)" >> "$GITHUB_OUTPUT"
+
+      # Cache only the Trivy vulnerability DBs (not scan results), keyed by date so the DB is
+      # downloaded ~once/day instead of every run. restore-keys falls back to the most recent
+      # earlier-day cache so a brand-new day still starts from a warm-ish dir; Trivy then refreshes
+      # only the parts that are out of date. We own this cache explicitly and set `cache: false` on
+      # the trivy-action steps below so the action does not also cache the same dir (no double save).
+      - name: Cache Trivy vulnerability DB
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: ${{ env.TRIVY_CACHE_DIR }}
+          key: trivy-db-${{ steps.trivy-db-date.outputs.date }}
+          restore-keys: |
+            trivy-db-
+
+      # buildx gives us a builder that can export/import a layer cache (type=gha). Needed for the
+      # cache-from/cache-to on the build step below.
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5 # v4.1.0
+
+      # Build the exact image this PR would ship and scan THAT (not a registry image). Layer cache
+      # is read from / written to the GitHub Actions cache (type=gha, mode=max caches intermediate
+      # stages too), so warm runs skip the heavy Maven dependency + jar layers. `load: true` loads
+      # the built image into the local Docker daemon so Trivy can scan it by ref.
       - name: Build image
-        run: docker build -t "$IMAGE" .
+        uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7.2.0
+        with:
+          context: .
+          tags: ${{ env.IMAGE }}
+          load: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       # Step A — produce SARIF for the Security tab. Never fails the job (exit-code 0); the gate is
       # step B. `limit-severities-for-sarif` is required or the SARIF ignores `severity` and floods
@@ -83,6 +122,11 @@ jobs:
           ignore-unfixed: true
           trivyignores: .trivyignore
           exit-code: '0'
+          # We manage the DB cache ourselves (date-keyed actions/cache above), so disable the
+          # action's built-in cache to avoid two cache entries fighting over the same dir. Trivy
+          # still reads/writes the cached DBs via TRIVY_CACHE_DIR (set on the job env) and only
+          # redownloads when its own DB metadata says the cached DB is stale.
+          cache: false
 
       # Upload even if the gate (step B) fails (if: always), and don't let a private-repo
       # "code scanning not enabled" 403 fail the job (continue-on-error) — step B is the
@@ -109,3 +153,4 @@ jobs:
           trivyignores: .trivyignore
           exit-code: '1'
           skip-setup-trivy: true   # reuse the Trivy binary + cached DB from step A
+          cache: false             # same as step A: our date-keyed cache owns TRIVY_CACHE_DIR
