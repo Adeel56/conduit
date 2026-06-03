@@ -52,7 +52,7 @@ class ApiKeyAuthIntegrationTest extends AbstractPostgresIntegrationTest {
 
     @Test
     void validKeyAuthenticatesAndResolvesTheOwningOrg() {
-        UUID orgId = UUID.randomUUID();
+        UUID orgId = newOrg("acme");
         CreatedApiKey created = apiKeys.create(orgId, "dashboard-key");
 
         ResponseEntity<Map<String, Object>> response = getMe(withKey(created.plaintextKey()));
@@ -81,7 +81,7 @@ class ApiKeyAuthIntegrationTest extends AbstractPostgresIntegrationTest {
 
     @Test
     void revokedKeyReturns401() {
-        CreatedApiKey created = apiKeys.create(UUID.randomUUID(), "to-be-revoked");
+        CreatedApiKey created = apiKeys.create(newOrg("revoke-org"), "to-be-revoked");
         apiKeys.revoke(created.apiKey().getId());
 
         ResponseEntity<Map<String, Object>> response = getMe(withKey(created.plaintextKey()));
@@ -92,7 +92,7 @@ class ApiKeyAuthIntegrationTest extends AbstractPostgresIntegrationTest {
 
     @Test
     void ingestStaysPublicWithNoApiKey() {
-        Source source = sources.create(UUID.randomUUID(), "stripe-prod");
+        Source source = sources.create(newOrg("ingest-org"), "stripe-prod");
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
@@ -113,8 +113,8 @@ class ApiKeyAuthIntegrationTest extends AbstractPostgresIntegrationTest {
 
     @Test
     void aKeyResolvesItsOwnOrgNotAnother() {
-        UUID orgA = UUID.randomUUID();
-        UUID orgB = UUID.randomUUID();
+        UUID orgA = newOrg("org-a");
+        UUID orgB = newOrg("org-b");
         CreatedApiKey keyA = apiKeys.create(orgA, "org-a-key");
         CreatedApiKey keyB = apiKeys.create(orgB, "org-b-key");
 

@@ -1,5 +1,8 @@
 package dev.conduit;
 
+import dev.conduit.organization.OrganizationService;
+import java.util.UUID;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 
@@ -11,4 +14,16 @@ import org.springframework.context.annotation.Import;
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @Import(PostgresContainerConfig.class)
 abstract class AbstractPostgresIntegrationTest {
+
+    @Autowired
+    private OrganizationService organizations;
+
+    /**
+     * Seed a real organization and return its id. Since CON-12 made {@code org_id} a foreign key,
+     * tenant rows (sources, api keys, events) must reference an organization that actually exists —
+     * so tests create one here instead of inventing a bare {@code UUID.randomUUID()}.
+     */
+    protected UUID newOrg(String name) {
+        return organizations.create(name).getId();
+    }
 }
