@@ -65,10 +65,14 @@ public class RouteService {
         }
 
         try {
-            return routes.save(new Route(orgId, sourceId, destinationId));
+            // saveAndFlush, NOT save: Route's id is application-assigned (GenerationType.UUID), so a
+            // plain save() defers the INSERT to commit — after this method returns, outside this
+            // catch — and a concurrent-duplicate unique violation would escape as a 500. Flushing
+            // here forces the INSERT now, so the race is caught and mapped to the same clean 409.
+            return routes.saveAndFlush(new Route(orgId, sourceId, destinationId));
         } catch (DataIntegrityViolationException race) {
-            // Backstop for the race where two concurrent creates both pass the pre-check: the unique
-            // index rejects the second insert. Translate to the same clean 409.
+            // Backstop for the race where two concurrent creates both pass the pre-check above: the
+            // unique index on (source_id, destination_id) rejects the second insert. Same clean 409.
             throw new DuplicateRouteException();
         }
     }
