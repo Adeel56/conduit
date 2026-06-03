@@ -2,17 +2,28 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Repository status: inception (docs only)
+## Repository status: active build (Build stage)
 
-There is **no application code, build file, or infrastructure yet**. The entire repo is the
-`docs/` tree plus `README.md`/`CONTRIBUTING.md`. The documentation *is* the current deliverable
-— this project is a deliberate simulation of a full product lifecycle (inception → design →
-build → harden → launch → operate), and the recorded *decisions and their reasoning* matter as
-much as the eventual code. Do not treat the docs as scaffolding to skip past.
+This is a **running Spring Boot 3.5.14 / Java 21 application**, not a docs-only repo. The Build
+stage is well underway: tickets **CON-3 through CON-12** are merged on `main`. What exists today:
 
-There are therefore no build/test/lint commands yet. They arrive in the **Foundation** stage
-(Maven or Gradle for the Spring Boot app; a per-project `docker-compose.yml` for services).
-**Update the "Commands" section below when that tooling lands** — do not invent commands now.
+- **Flyway migrations V1–V5**: V1 baseline (no schema, proves the pipeline), V2 sources + events,
+  V3 api_keys, V4 organizations (makes `org_id` a real FK), V5 destinations + routes. Each schema
+  migration has a **tested undo** in `src/main/resources/db/undo` (U2–U5; V1 has no schema, so no
+  undo). Flyway Community runs no undos automatically — they are the tested reverse path.
+- **Stateless API-key auth** (Spring Security): every request needs a valid key except a public
+  allowlist (`/health`, `/ingest/**`). See `src/main/java/dev/conduit/auth/SecurityConfig.java`.
+- **Features shipped:** ingest (`POST /ingest/{ingestKey}` stores an immutable Event), the event
+  inspector (list/view, tenant-scoped), organizations, destinations + routes, source CRUD.
+- **Testcontainers integration tests** (boot the app against a real Postgres), a **multi-stage
+  distroless Dockerfile** (non-root, pinned by digest), and **GitHub Actions CI** with a Trivy
+  image scan + CodeQL static analysis.
+
+The project remains a deliberate simulation of a full product lifecycle (inception → design →
+build → harden → launch → operate); the recorded *decisions and their reasoning* still matter as
+much as the code. The design-intent sections below (tech stack, security model, data model) record
+where this is **heading** — some of it is built, some is still planned; the data model
+(`docs/data-model.md`) marks each entity built vs. unbuilt.
 
 ## What Conduit is
 
@@ -46,7 +57,8 @@ Full detail in `CONTRIBUTING.md` and the ADRs. The load-bearing constraints:
 - **Significant decisions get an ADR** in `docs/adr/` (next number, `0000-template.md` shape),
   including the options **rejected** and a **reversal** plan — that section is the point of an ADR.
 - **Security is shifted left** — security criteria ride on the ticket as acceptance criteria, not
-  bolted on after. The full **Definition of Done** is a hard gate (checklist at the end of this file).
+  bolted on after. The full **Definition of Done** (the canonical checklist in `CONTRIBUTING.md`)
+  is a hard gate on every change.
 - **You must be able to explain every line that merges.** AI accelerates the *typing*, not the
   *deciding* (`docs/adr/0007`). **Verify any AI-suggested dependency against the official registry
   before adding it** (hallucination → dependency-confusion is an in-scope threat).
@@ -97,7 +109,18 @@ that must land in the relevant code/manifests:
   private/link-local/cloud-metadata ranges and **resolve-then-validate** to defeat DNS rebinding.
 - **Tenant isolation at the row level**, tested explicitly (a cross-org leak is the worst-case bug).
 - **Inbound HMAC signature verification**, replay-window checks, payload size caps / decompression-bomb guards.
-- **Argon2** password hashing; scoped, hashed-at-rest, rotatable API keys; app RBAC (owner/admin/member/viewer).
+- **API-key auth (built today):** a stateless Spring Security filter, no sessions. A presented key
+  is `prefix.secret`; we look up by the non-secret `prefix`, then verify the secret against a
+  **salted SHA-256** hash stored as `salt:hash` with a **constant-time** compare. SHA-256 (not
+  Argon2) is deliberate here — the secret is already 256 bits of CSPRNG entropy, so a fast salted
+  hash is cryptographically sufficient (see `apikey/ApiKeyHasher.java`). Keys are scoped
+  (`scopes` column), **hashed-at-rest** (raw key never stored), and **revocable** (soft `revoked_at`;
+  revoked keys fail auth). Every failure mode returns an identical 401 (existence/revocation never
+  leaked), and a dummy-hash comparison equalizes timing on the not-found path
+  (`apikey/ApiKeyService.java`).
+- **Planned (NOT built yet):** **Argon2** password hashing, a **`User`** entity, and app **RBAC**
+  (owner/admin/member/viewer). There is no human-login path today — auth is API-key only. The
+  data-model entries for these are design intent; do not assume they exist in code.
 - App-layer rate limiting + **load shedding** (fast 429), circuit breakers, bulkheads; volumetric DDoS is **delegated to the edge** (Cloudflare).
 - **Containers** are reviewed against `docs/security/container-baseline.md` as a gate: multi-stage
   build, distroless/pinned-by-digest base, non-root, read-only rootfs, drop ALL caps,
@@ -113,17 +136,35 @@ that must land in the relevant code/manifests:
 - `docs/runbooks/` — operational procedures (deploy/rollback/recover). *Planned; not created yet.*
 - `README.md` — the product arc and why the repo looks this way; `CONTRIBUTING.md` — branching model, PR lifecycle, Definition of Done.
 
-## Definition of Done (every change — from `CONTRIBUTING.md`)
+## Definition of Done
 
-- [ ] Acceptance criteria met, including any **security** criteria on the ticket.
-- [ ] Tests written and passing.
-- [ ] Reverse plan filled in and credible, matched to the change type.
-- [ ] Observability added (logs/metrics for the new behaviour).
-- [ ] Docs/ADR updated if a decision was made.
-- [ ] CI green, including security scans (Trivy/CodeQL).
-- [ ] You can explain every line that merges (`docs/adr/0007`).
+The canonical Definition of Done checklist lives in **`CONTRIBUTING.md`** — every change must meet
+it. (It is kept in one place on purpose; do not copy it back here.)
 
 ## Commands
 
-None yet (inception phase — no build tooling exists). Populate when Foundation adds the Spring
-Boot build and `docker-compose.yml`, including how to run a single test.
+Maven (via the committed wrapper `./mvnw`) is the build tool. The integration tests use
+Testcontainers, so **Docker must be running** for `verify` and for any single integration test.
+
+```bash
+# Full build + all tests (unit + Testcontainers integration tests). Requires Docker.
+./mvnw verify
+
+# Run a single test class…
+./mvnw -Dtest=EventInspectorIntegrationTest test
+# …or a single method:
+./mvnw -Dtest=EventInspectorIntegrationTest#sourceIdFilterStaysOrgScoped test
+# (Integration tests are *Test classes run by Surefire — there is no separate Failsafe phase —
+#  so they still need Docker even under `test`.)
+
+# Bring up the whole stack in containers: Postgres + a Redis stub (placeholder for the future
+# rate-limiter / delivery queue; nothing talks to it yet) + the app on :8080. Requires a .env:
+cp .env.example .env          # then set POSTGRES_PASSWORD
+docker compose up --build
+curl localhost:8080/health    # -> {"status":"UP"} (200; 503 if the DB is down)
+docker compose down           # add -v to also wipe the Postgres volume
+
+# Run the app from source against just the DB in a container (reads SPRING_DATASOURCE_* from env):
+docker compose up -d postgres
+./mvnw spring-boot:run
+```

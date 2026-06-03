@@ -21,8 +21,8 @@ If you are reading this as an interviewer: the `/docs` folder is the point. It s
 
 1. **Inception** — problem brief, threat model, scope boundary, first decisions.
 2. **Design** — architecture, data model, API contract, ADRs.
-3. **Foundation** — repo, branching, CI skeleton, local docker-compose. ← *we are here*
-4. **Build sprints** — features as tickets → branches → PRs → review → merge.
+3. **Foundation** — repo, branching, CI skeleton, local docker-compose.
+4. **Build sprints** — features as tickets → branches → PRs → review → merge. ← *we are here*
 5. **Hardening** — load tests, security pass, rollback drills, staging.
 6. **Launch** — release strategy, Terraform apply, Kubernetes.
 7. **Operate** — observability, on-call simulation, injected incident + postmortem.
@@ -38,10 +38,13 @@ If you are reading this as an interviewer: the `/docs` folder is the point. It s
 | `docs/templates/` | The change/reversal template every ticket uses. |
 | `docs/runbooks/` | Operational docs: how to deploy, how to roll back, how to recover. |
 
-## Running locally (walking skeleton)
+## Running locally
 
-The current build is a **walking skeleton** (CON-3): a Spring Boot app + Postgres + a `/health`
-endpoint, containerized, with CI. No product features yet — it exists to prove the plumbing.
+The Build stage is underway (CON-3 → CON-12). Past the original walking skeleton (a Spring Boot
+app + Postgres + `/health`), the app now **receives** webhooks (`POST /ingest/{ingestKey}` stores
+an immutable Event), lets you **inspect** stored events (tenant-scoped list/view), authenticates
+callers with **API keys**, and manages **organizations, sources, destinations, and routes** — the
+wiring that delivery (a later ticket) will run on. It is still self-hosted, containerized, and CI-gated.
 
 **Prerequisites:** Docker + Docker Compose. (For running the app outside a container you also need
 JDK 21 — Temurin via SDKMAN, per ADR-0006.)
