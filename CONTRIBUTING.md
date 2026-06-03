@@ -53,11 +53,18 @@ aligns with our squash convention), require successful deployment.
 
 ## Definition of Done
 
+This is the **canonical** Definition of Done — the single source of truth. Other docs (CLAUDE.md,
+the PR template, the ticket template) point here rather than duplicating it, so it stays in one place.
+
 - [ ] Acceptance criteria met (incl. any **security** criteria on the ticket).
 - [ ] Tests written and passing.
 - [ ] Reverse plan filled in and *credible*.
 - [ ] Observability added (logs/metrics for the new behaviour).
-- [ ] Docs/ADR updated if a decision was made.
+- [ ] **Docs reflect the current state of the system** — not only when a decision was made. Doc rot
+      is a *state* change, not a decision, so "update docs if a decision was made" misses it. Check
+      the drift surface every change touches: CLAUDE.md status/commands, README stage,
+      `docs/data-model.md` markers, and any relevant ADR. If nothing drifted, say so (N/A) rather
+      than skipping the check.
 - [ ] CI green, including security scans.
 
 ## On using AI (Claude Code etc.) the right way
