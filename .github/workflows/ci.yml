@@ -128,11 +128,15 @@ jobs:
           # redownloads when its own DB metadata says the cached DB is stale.
           cache: false
 
-      # Upload even if the gate (step B) fails (if: always), and don't let a private-repo
-      # "code scanning not enabled" 403 fail the job (continue-on-error) — step B is the
+      # Upload the SARIF to the Security tab — but ONLY on a public repo. Code scanning on a
+      # PRIVATE repo needs GitHub Advanced Security; without it the upload 403s ("code scanning
+      # not enabled"), which is harmless (continue-on-error) but spams the log. Gating on
+      # `repository.private == false` skips the attempt on private repos (no noise) and runs it
+      # automatically if the repo is ever made public. `if: always()` so it still uploads when the
+      # gate (step B) fails; `continue-on-error` as a backstop. Step B — not this upload — is the
       # authoritative pass/fail. Distinct category so it won't merge with CodeQL's results.
       - name: Upload Trivy SARIF
-        if: always()
+        if: always() && github.event.repository.private == false
         continue-on-error: true
         uses: github/codeql-action/upload-sarif@7211b7c8077ea37d8641b6271f6a365a22a5fbfa # v4.36.0
         with:
