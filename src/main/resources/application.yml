@@ -49,3 +49,14 @@ conduit:
     # Hard cap on a received webhook body; larger requests are rejected with 413 before any storage
     # work (abuse / memory-exhaustion guard). Accepts sizes like 512KB, 1MB, 2MB.
     max-body-size: 1MB
+
+  # Delivery engine (CON-13). The worker delivers stored events to destinations with retries + backoff.
+  delivery:
+    enabled: true            # master switch for the background worker's scheduled poll
+    poll-interval: 1s        # how often the worker claims due deliveries
+    batch-size: 50           # max deliveries claimed per poll
+    max-attempts: 5          # attempt cap; past it a delivery is dead-lettered (failed)
+    backoff-base: 1s         # exponential retry base (1s, 4s, 16s, ... before jitter)
+    backoff-max: 5m          # ceiling on a single backoff delay
+    connect-timeout: 5s      # outbound HTTP connect timeout
+    request-timeout: 10s     # outbound HTTP overall timeout (no worker hangs on a dead destination)

@@ -5,6 +5,7 @@ import java.util.UUID;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.test.context.TestPropertySource;
 
 /**
  * Base for integration tests that boot the full Spring context against a real Postgres
@@ -13,6 +14,9 @@ import org.springframework.context.annotation.Import;
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @Import(PostgresContainerConfig.class)
+// Delivery worker's scheduled auto-poll OFF for the whole suite so tests are deterministic: delivery
+// tests create pending rows (fan-out still runs) and drive the worker explicitly, not via a timer.
+@TestPropertySource(properties = "conduit.delivery.enabled=false")
 abstract class AbstractPostgresIntegrationTest {
 
     @Autowired

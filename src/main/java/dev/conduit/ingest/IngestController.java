@@ -2,6 +2,7 @@ package dev.conduit.ingest;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import dev.conduit.delivery.DeliveryFanout;
 import dev.conduit.event.Event;
 import dev.conduit.event.EventRepository;
 import dev.conduit.source.Source;
@@ -19,6 +20,7 @@ import java.util.Map;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -50,15 +52,19 @@ public class IngestController {
     private final IngestProperties properties;
     private final ObjectMapper objectMapper;
     private final MeterRegistry meters;
+    // Optional (ObjectProvider) so ingest works with OR without the delivery engine on the classpath
+    // (CON-13). Present → fan-out runs off the request path; absent → ingest still stores + 202s.
+    private final ObjectProvider<DeliveryFanout> deliveryFanout;
 
     public IngestController(SourceRepository sources, EventRepository events,
                             IngestProperties properties, ObjectMapper objectMapper,
-                            MeterRegistry meters) {
+                            MeterRegistry meters, ObjectProvider<DeliveryFanout> deliveryFanout) {
         this.sources = sources;
         this.events = events;
         this.properties = properties;
         this.objectMapper = objectMapper;
         this.meters = meters;
+        this.deliveryFanout = deliveryFanout;
     }
 
     @PostMapping("/ingest/{ingestKey}")
@@ -91,6 +97,11 @@ public class IngestController {
         // 3. Store the event with org_id taken from the source (events are never orphaned), then ack.
         Event event = Event.received(source.getOrgId(), source.getId(), payload, headersAsJson(request));
         events.save(event);
+
+        // Fan out delivery strictly OFF the request path: the event is durably stored and about to be
+        // 202'd; the delivery engine (when present) picks it up asynchronously, so a slow/failing
+        // destination can never affect ingest latency (ADR-0003 / CON-13).
+        deliveryFanout.ifAvailable(fanout -> fanout.onEventStored(event.getId()));
 
         count("accepted");
         // Log ids + size only — never the payload or headers (they can carry secrets/PII).
